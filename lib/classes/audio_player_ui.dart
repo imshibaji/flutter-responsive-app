@@ -1,4 +1,4 @@
-// ignore_for_file: avoid_print
+// ignore_for_file: avoid_print, must_be_immutable
 
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
@@ -7,7 +7,9 @@ import 'package:tutorial_app/classes/audio_provider.dart';
 import 'package:tutorial_app/classes/marquee.dart';
 
 class AudioPlayerUI extends StatefulWidget {
-  const AudioPlayerUI({super.key});
+  const AudioPlayerUI({
+    super.key,
+  });
 
   @override
   State<AudioPlayerUI> createState() => _AudioPlayerUIState();
@@ -16,7 +18,7 @@ class AudioPlayerUI extends StatefulWidget {
 class _AudioPlayerUIState extends State<AudioPlayerUI> {
   String audio = 'audios/song2.mp3';
   bool isPlay = true, isMute = false;
-  double curTime = 0.0, totalTime = 0.0, volume = 0.10;
+  double curTime = 0.0, totalTime = 0.0, volume = 0.50;
   AudioPlayer player = AudioPlayer();
 
   @override
@@ -36,7 +38,7 @@ class _AudioPlayerUIState extends State<AudioPlayerUI> {
   }
 
   void playerInit() {
-    player.setPlayerMode(PlayerMode.lowLatency);
+    player.setPlayerMode(PlayerMode.mediaPlayer);
     player.setVolume(volume);
     player.release();
     onCheck();
@@ -47,6 +49,7 @@ class _AudioPlayerUIState extends State<AudioPlayerUI> {
       audio = url;
     });
     await player.setSourceAsset(url);
+    totalDuration();
   }
 
   setSourceUrl(String url) async {
@@ -54,6 +57,7 @@ class _AudioPlayerUIState extends State<AudioPlayerUI> {
       audio = url;
     });
     await player.setSourceUrl(url);
+    totalDuration();
   }
 
   setDeviceUrl(String url) async {
@@ -61,15 +65,18 @@ class _AudioPlayerUIState extends State<AudioPlayerUI> {
       audio = url;
     });
     await player.setSource(DeviceFileSource(url));
+    totalDuration();
   }
 
-  void onPlay(WidgetRef ref) async {
-    ref.watch(audioProvider.notifier).getSong().then(
-          (value) => {
-            setAssetUrl(value),
-          },
-        );
+  loadData(WidgetRef ref) {
+    if (ref.watch(audioProvider.notifier).song != audio) {
+      ref.watch(audioProvider.notifier).getSong().then(
+            (value) => {setAssetUrl(value)},
+          );
+    }
+  }
 
+  void onPlay() async {
     if (isPlay == true) {
       await player.resume();
     } else {
@@ -78,7 +85,6 @@ class _AudioPlayerUIState extends State<AudioPlayerUI> {
     setState(() {
       isPlay = !isPlay;
     });
-    totalDuration();
   }
 
   void onStop() {
@@ -89,21 +95,36 @@ class _AudioPlayerUIState extends State<AudioPlayerUI> {
   }
 
   void totalDuration() {
-    player.getDuration().then((Duration? value) {
-      totalTime = value!.inMilliseconds.toDouble();
-      // print('Total Duration: $totalTime');
+    player.onDurationChanged.listen((Duration d) {
+      setState(() {
+        totalTime = d.inMilliseconds.toDouble();
+      });
+      // print('Totle Duration: $totalTime');
     });
   }
 
   void onCheck() {
     player.onPositionChanged.listen((Duration p) {
-      curTime = (p.inMilliseconds.toDouble() / totalTime);
-      if (player.state == PlayerState.completed) {
+      var curPos = (p.inMilliseconds.toDouble() / totalTime);
+      curTime = curPos < 1 ? curPos : 1.0;
+      setState(() {});
+    });
+    player.onPlayerStateChanged.listen((PlayerState state) {
+      if (state == PlayerState.completed) {
         player.seek(Duration.zero);
         curTime = 0.0;
         isPlay = true;
         player.release();
+        totalDuration();
+        setState(() {});
       }
+    });
+    player.onPlayerComplete.listen((_) {
+      player.seek(Duration.zero);
+      curTime = 0.0;
+      isPlay = true;
+      player.release();
+      totalDuration();
       setState(() {});
     });
   }
@@ -114,12 +135,34 @@ class _AudioPlayerUIState extends State<AudioPlayerUI> {
     setState(() {});
   }
 
-  @override
-  void dispose() {
-    super.dispose();
+  void changeVolume(double value) {
+    setState(() {
+      volume = value;
+      player.setVolume(volume);
+    });
+  }
+
+  void onMute() {
+    if (isMute == false) {
+      player.setVolume(0);
+    } else {
+      player.setVolume(1);
+    }
+    setState(() {
+      isMute = !isMute;
+    });
+  }
+
+  void onDispose() {
     player.stop();
     player.release();
     player.dispose();
+  }
+
+  @override
+  void dispose() {
+    super.dispose();
+    onDispose();
   }
 
   @override
@@ -176,9 +219,7 @@ class _AudioPlayerUIState extends State<AudioPlayerUI> {
               max: 1.0,
               min: 0.0,
               value: curTime,
-              onChanged: (value) {
-                onSeek(value);
-              },
+              onChanged: onSeek,
             ),
           )
         ],
@@ -190,16 +231,7 @@ class _AudioPlayerUIState extends State<AudioPlayerUI> {
     return Row(
       children: [
         IconButton(
-          onPressed: () {
-            if (isMute == false) {
-              player.setVolume(0);
-            } else {
-              player.setVolume(volume);
-            }
-            setState(() {
-              isMute = !isMute;
-            });
-          },
+          onPressed: onMute,
           icon: Icon(
             isMute ? Icons.volume_off : Icons.volume_up,
             color: Theme.of(context).colorScheme.onPrimary,
@@ -213,12 +245,7 @@ class _AudioPlayerUIState extends State<AudioPlayerUI> {
             max: 1.0,
             min: 0.0,
             value: volume,
-            onChanged: (value) {
-              setState(() {
-                volume = value;
-                player.setVolume(volume);
-              });
-            },
+            onChanged: changeVolume,
           ),
         ),
       ],
@@ -226,11 +253,12 @@ class _AudioPlayerUIState extends State<AudioPlayerUI> {
   }
 
   Consumer playStopButtons(BuildContext context) {
-    return Consumer(
-      builder: (context, ref, child) => Row(
+    return Consumer(builder: (context, ref, child) {
+      loadData(ref);
+      return Row(
         children: [
           IconButton(
-            onPressed: () => onPlay(ref),
+            onPressed: () => onPlay(),
             icon: Icon(
               isPlay ? Icons.play_arrow_outlined : Icons.pause,
               color: Theme.of(context).colorScheme.onPrimary,
@@ -246,7 +274,7 @@ class _AudioPlayerUIState extends State<AudioPlayerUI> {
             ),
           ),
         ],
-      ),
-    );
+      );
+    });
   }
 }

@@ -17,7 +17,7 @@ final images = [
 ];
 
 final audios = [
-  'audios/song1.wav',
+  'audios/song1.mp3',
   'audios/song2.mp3',
 ];
 
@@ -113,8 +113,8 @@ class HomeScreen extends ConsumerWidget {
               onPressed: () => goToReplace(context, const AboutScreen())),
         ]),
       ),
-      appFooter: const AudioPlayerUI(),
-      footerHeight: 134,
+      // appFooter: const AudioPlayerUI(),
+      // footerHeight: 134,
     );
   }
 

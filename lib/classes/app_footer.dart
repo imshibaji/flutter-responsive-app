@@ -2,6 +2,7 @@
 
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:tutorial_app/classes/audio_player_ui_2.dart';
 
 class AppFooter extends StatelessWidget {
   double height;
@@ -15,7 +16,7 @@ class AppFooter extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: height + 16,
+      height: height + 100,
       child: Column(
         children: [
           player != null
@@ -25,6 +26,10 @@ class AppFooter extends StatelessWidget {
                   child: player,
                 )
               : Container(),
+          const Padding(
+            padding: EdgeInsets.only(bottom: 6, left: 8, right: 8, top: 10),
+            child: AudioPlayerUI2(),
+          ),
           Container(
             padding: const EdgeInsets.symmetric(vertical: 4),
             decoration: ShapeDecoration(
